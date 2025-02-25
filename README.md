@@ -1,2 +1,2 @@
 # elenchino
-comprende tutte le aziende
+Comprende tutte le aziende
