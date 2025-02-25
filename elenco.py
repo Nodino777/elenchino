@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import io
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-st.title("Visualizzatore di file CSV")
+st.title("Editor di file CSV")
 
 # Caricamento del file
 uploaded_file = st.file_uploader("Carica un file CSV", type="csv")
@@ -26,57 +27,99 @@ if uploaded_file is not None:
         else:
             df = pd.read_csv(uploaded_file, delimiter=delimiter, encoding=encoding, header=None)
         
+        # Salva il dataframe originale nella sessione
+        if 'original_df' not in st.session_state:
+            st.session_state.original_df = df.copy()
+        
         # Mostra informazioni sul dataset
         st.subheader("Informazioni sul dataset")
         st.write(f"Numero di righe: {df.shape[0]}")
         st.write(f"Numero di colonne: {df.shape[1]}")
         
-        # Mostra i dati
-        st.subheader("Anteprima dei dati")
-        st.dataframe(df.head(10))
+        # Mostra i dati con AgGrid per editing
+        st.subheader("Modifica dei dati")
+        st.write("Puoi modificare direttamente i dati nella tabella sottostante. Clicca su una cella per modificarla.")
         
-        # Opzioni di visualizzazione avanzate
-        st.subheader("Visualizzazione avanzata")
+        # Configurazione per AgGrid
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
+        gb.configure_default_column(editable=True, groupable=True, value=True, enableRowGroup=True, enablePivot=True)
+        gridOptions = gb.build()
         
-        # Selezione colonne
-        all_columns = df.columns.tolist()
-        selected_columns = st.multiselect("Seleziona colonne da visualizzare", all_columns, default=all_columns[:5] if len(all_columns) > 5 else all_columns)
+        # Visualizza la grid con AgGrid
+        grid_response = AgGrid(
+            df,
+            gridOptions=gridOptions,
+            update_mode=GridUpdateMode.MODEL_CHANGED,
+            fit_columns_on_grid_load=True,
+            data_return_mode=DataReturnMode.AS_INPUT,
+            height=400
+        )
         
-        if selected_columns:
-            st.dataframe(df[selected_columns])
+        # Ottieni il dataframe aggiornato
+        updated_df = grid_response['data']
         
-        # Opzione per scaricare il dataframe filtrato
-        if st.button("Scarica dati filtrati come CSV"):
-            csv = df[selected_columns].to_csv(index=False)
-            b64 = io.StringIO()
-            b64.write(csv)
-            b64.seek(0)
-            st.download_button(
-                label="Scarica CSV",
-                data=b64,
-                file_name="dati_filtrati.csv",
-                mime="text/csv"
+        # Aggiungi pulsanti per ripristinare e scaricare
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("Ripristina dati originali"):
+                updated_df = st.session_state.original_df.copy()
+                st.experimental_rerun()
+        
+        with col2:
+            # Opzione per scaricare il dataframe modificato
+            if st.button("Scarica dati modificati"):
+                csv = updated_df.to_csv(index=False)
+                b64 = io.StringIO()
+                b64.write(csv)
+                b64.seek(0)
+                st.download_button(
+                    label="Scarica CSV modificato",
+                    data=b64,
+                    file_name="dati_modificati.csv",
+                    mime="text/csv"
+                )
+        
+        with col3:
+            # Aggiungi riga vuota
+            if st.button("Aggiungi riga vuota"):
+                empty_row = pd.DataFrame({col: [""] for col in updated_df.columns}, index=[0])
+                updated_df = pd.concat([updated_df, empty_row], ignore_index=True)
+                st.experimental_rerun()
+        
+        # Opzioni di ricerca e filtraggio
+        st.subheader("Ricerca e filtraggio")
+        search_term = st.text_input("Termine di ricerca")
+        
+        if search_term:
+            # Cerca in tutte le colonne
+            filtered_df = updated_df[updated_df.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)]
+            st.write(f"Risultati trovati: {filtered_df.shape[0]}")
+            
+            # Visualizza i risultati filtrati
+            gb_filtered = GridOptionsBuilder.from_dataframe(filtered_df)
+            gb_filtered.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
+            gb_filtered.configure_default_column(editable=True)
+            gridOptions_filtered = gb_filtered.build()
+            
+            filtered_grid = AgGrid(
+                filtered_df,
+                gridOptions=gridOptions_filtered,
+                update_mode=GridUpdateMode.MODEL_CHANGED,
+                fit_columns_on_grid_load=True,
+                key="filtered_grid"
             )
         
         # Statistiche di base
         if st.checkbox("Mostra statistiche"):
             st.subheader("Statistiche descrittive")
-            st.write(df.describe())
-            
-        # Ricerca nel dataset
-        st.subheader("Ricerca nel dataset")
-        search_term = st.text_input("Termine di ricerca")
-        
-        if search_term:
-            # Cerca in tutte le colonne
-            filtered_df = df[df.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)]
-            st.write(f"Risultati trovati: {filtered_df.shape[0]}")
-            st.dataframe(filtered_df)
-    
+            st.write(updated_df.describe())
+
     except Exception as e:
-        st.error(f"Si è verificato un errore nella lettura del file: {e}")
+        st.error(f"Si è verificato un errore nella lettura o modifica del file: {e}")
 else:
-    st.info("Carica un file CSV per visualizzare i dati")
+    st.info("Carica un file CSV per visualizzare e modificare i dati")
     
     # Esempio
     st.subheader("Esempio di utilizzo:")
@@ -84,5 +127,8 @@ else:
     1. Clicca sul pulsante 'Carica un file CSV'
     2. Seleziona il tuo file CSV dal computer
     3. Configura le opzioni di lettura se necessario
-    4. Esplora i tuoi dati!
+    4. Modifica i dati direttamente nella tabella
+    5. Scarica il file modificato quando hai finito
     """)
+    
+    st.warning("Nota: Per utilizzare questa applicazione è necessario installare la libreria streamlit-aggrid con il comando: `pip install streamlit-aggrid`")
