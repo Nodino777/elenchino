@@ -1,9 +1,13 @@
 import streamlit as st
 import pandas as pd
 import io
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
+import numpy as np
 
 st.title("Editor di file CSV")
+
+# Funzioni di supporto
+def convert_df_to_csv(df):
+    return df.to_csv(index=False).encode('utf-8')
 
 # Caricamento del file
 uploaded_file = st.file_uploader("Carica un file CSV", type="csv")
@@ -27,97 +31,122 @@ if uploaded_file is not None:
         else:
             df = pd.read_csv(uploaded_file, delimiter=delimiter, encoding=encoding, header=None)
         
-        # Salva il dataframe originale nella sessione
+        # Salva il dataframe originale nella sessione se non esiste già
         if 'original_df' not in st.session_state:
             st.session_state.original_df = df.copy()
         
+        # Salva il dataframe di lavoro nella sessione se non esiste già
+        if 'working_df' not in st.session_state:
+            st.session_state.working_df = df.copy()
+        
         # Mostra informazioni sul dataset
         st.subheader("Informazioni sul dataset")
-        st.write(f"Numero di righe: {df.shape[0]}")
-        st.write(f"Numero di colonne: {df.shape[1]}")
+        st.write(f"Numero di righe: {st.session_state.working_df.shape[0]}")
+        st.write(f"Numero di colonne: {st.session_state.working_df.shape[1]}")
         
-        # Mostra i dati con AgGrid per editing
+        # Opzioni di modifica
         st.subheader("Modifica dei dati")
-        st.write("Puoi modificare direttamente i dati nella tabella sottostante. Clicca su una cella per modificarla.")
         
-        # Configurazione per AgGrid
-        gb = GridOptionsBuilder.from_dataframe(df)
-        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
-        gb.configure_default_column(editable=True, groupable=True, value=True, enableRowGroup=True, enablePivot=True)
-        gridOptions = gb.build()
+        edit_tab, view_tab = st.tabs(["Modifica", "Visualizza"])
         
-        # Visualizza la grid con AgGrid
-        grid_response = AgGrid(
-            df,
-            gridOptions=gridOptions,
-            update_mode=GridUpdateMode.MODEL_CHANGED,
-            fit_columns_on_grid_load=True,
-            data_return_mode=DataReturnMode.AS_INPUT,
-            height=400
-        )
+        with edit_tab:
+            # Seleziona riga da modificare
+            if not st.session_state.working_df.empty:
+                row_count = len(st.session_state.working_df)
+                row_to_edit = st.number_input("Seleziona riga da modificare", 
+                                            min_value=0, 
+                                            max_value=row_count-1, 
+                                            value=0,
+                                            step=1)
+                
+                st.write("Modifica i valori della riga selezionata:")
+                
+                # Crea un form per l'editing
+                with st.form(key="edit_form"):
+                    edited_row = {}
+                    for col in st.session_state.working_df.columns:
+                        # Ottieni il valore corrente
+                        current_value = st.session_state.working_df.at[row_to_edit, col]
+                        
+                        # Gestisci diversi tipi di dati
+                        if pd.isna(current_value):
+                            current_value = ""
+                        
+                        # Crea un input per ogni colonna
+                        edited_row[col] = st.text_input(f"{col}", value=str(current_value))
+                    
+                    # Bottone per salvare le modifiche
+                    submit_button = st.form_submit_button(label="Salva modifiche")
+                    
+                if submit_button:
+                    # Aggiorna il dataframe con i valori modificati
+                    for col, value in edited_row.items():
+                        st.session_state.working_df.at[row_to_edit, col] = value
+                    
+                    st.success(f"Riga {row_to_edit} aggiornata con successo!")
+            
+            # Opzione per aggiungere una nuova riga
+            st.subheader("Aggiungi nuova riga")
+            with st.form(key="add_row_form"):
+                new_row = {}
+                for col in st.session_state.working_df.columns:
+                    new_row[col] = st.text_input(f"Nuovo valore per {col}", value="")
+                
+                add_button = st.form_submit_button(label="Aggiungi riga")
+            
+            if add_button:
+                # Aggiungi la nuova riga al dataframe
+                st.session_state.working_df = pd.concat([st.session_state.working_df, 
+                                                      pd.DataFrame([new_row])], 
+                                                      ignore_index=True)
+                st.success("Nuova riga aggiunta con successo!")
         
-        # Ottieni il dataframe aggiornato
-        updated_df = grid_response['data']
+        with view_tab:
+            # Mostra l'anteprima del dataframe
+            st.dataframe(st.session_state.working_df)
         
-        # Aggiungi pulsanti per ripristinare e scaricare
-        col1, col2, col3 = st.columns(3)
+        # Azioni sul dataset
+        st.subheader("Azioni sul dataset")
+        
+        col1, col2 = st.columns(2)
         
         with col1:
             if st.button("Ripristina dati originali"):
-                updated_df = st.session_state.original_df.copy()
+                st.session_state.working_df = st.session_state.original_df.copy()
+                st.success("Dati ripristinati all'originale!")
                 st.experimental_rerun()
         
         with col2:
             # Opzione per scaricare il dataframe modificato
-            if st.button("Scarica dati modificati"):
-                csv = updated_df.to_csv(index=False)
-                b64 = io.StringIO()
-                b64.write(csv)
-                b64.seek(0)
-                st.download_button(
-                    label="Scarica CSV modificato",
-                    data=b64,
-                    file_name="dati_modificati.csv",
-                    mime="text/csv"
-                )
-        
-        with col3:
-            # Aggiungi riga vuota
-            if st.button("Aggiungi riga vuota"):
-                empty_row = pd.DataFrame({col: [""] for col in updated_df.columns}, index=[0])
-                updated_df = pd.concat([updated_df, empty_row], ignore_index=True)
-                st.experimental_rerun()
-        
-        # Opzioni di ricerca e filtraggio
-        st.subheader("Ricerca e filtraggio")
-        search_term = st.text_input("Termine di ricerca")
-        
-        if search_term:
-            # Cerca in tutte le colonne
-            filtered_df = updated_df[updated_df.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)]
-            st.write(f"Risultati trovati: {filtered_df.shape[0]}")
-            
-            # Visualizza i risultati filtrati
-            gb_filtered = GridOptionsBuilder.from_dataframe(filtered_df)
-            gb_filtered.configure_pagination(paginationAutoPageSize=False, paginationPageSize=10)
-            gb_filtered.configure_default_column(editable=True)
-            gridOptions_filtered = gb_filtered.build()
-            
-            filtered_grid = AgGrid(
-                filtered_df,
-                gridOptions=gridOptions_filtered,
-                update_mode=GridUpdateMode.MODEL_CHANGED,
-                fit_columns_on_grid_load=True,
-                key="filtered_grid"
+            csv = convert_df_to_csv(st.session_state.working_df)
+            st.download_button(
+                label="Scarica dati modificati",
+                data=csv,
+                file_name="dati_modificati.csv",
+                mime="text/csv"
             )
+        
+        # Opzioni aggiuntive
+        st.subheader("Opzioni aggiuntive")
+        
+        # Ricerca nel dataset
+        search_term = st.text_input("Cerca nel dataset")
+        if search_term:
+            # Converti tutto in stringhe per la ricerca
+            mask = np.column_stack([st.session_state.working_df[col].astype(str).str.contains(search_term, na=False, case=False) 
+                                   for col in st.session_state.working_df.columns])
+            filtered_df = st.session_state.working_df.loc[mask.any(axis=1)]
+            
+            st.write(f"Risultati trovati: {len(filtered_df)} righe")
+            st.dataframe(filtered_df)
         
         # Statistiche di base
         if st.checkbox("Mostra statistiche"):
             st.subheader("Statistiche descrittive")
-            st.write(updated_df.describe())
-
+            st.write(st.session_state.working_df.describe())
+            
     except Exception as e:
-        st.error(f"Si è verificato un errore nella lettura o modifica del file: {e}")
+        st.error(f"Si è verificato un errore: {e}")
 else:
     st.info("Carica un file CSV per visualizzare e modificare i dati")
     
@@ -127,8 +156,7 @@ else:
     1. Clicca sul pulsante 'Carica un file CSV'
     2. Seleziona il tuo file CSV dal computer
     3. Configura le opzioni di lettura se necessario
-    4. Modifica i dati direttamente nella tabella
-    5. Scarica il file modificato quando hai finito
+    4. Vai alla scheda 'Modifica' per modificare i dati riga per riga
+    5. Aggiungi nuove righe se necessario
+    6. Scarica il file modificato quando hai finito
     """)
-    
-    st.warning("Nota: Per utilizzare questa applicazione è necessario installare la libreria streamlit-aggrid con il comando: `pip install streamlit-aggrid`")
