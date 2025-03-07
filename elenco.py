@@ -155,7 +155,15 @@ with tab2:
                 # Create columns for charts
                 col1, col2 = st.columns(2)
                 
-ror(f"Error creating scatter plot: {str(e)}")
+                # Here should be code to create visualizations in col1 and col2
+                # The code appears to be missing from the original file
+                with col1:
+                    st.write("Visualization 1")
+                    # Add your visualization code here
+                    
+                with col2:
+                    st.write("Visualization 2")
+                    # Add your visualization code here
                 
                 # Summary statistics
                 st.subheader("Summary Statistics")
