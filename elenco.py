@@ -112,8 +112,20 @@ if 'selected_row_index' not in st.session_state:
 
 # Function to handle selection callback
 def handle_selection(selection):
-    if selection and hasattr(selection, 'rows') and selection.rows:
-        st.session_state.selected_row_index = selection.rows[0]
+    # Handle different types of selection objects safely
+    if selection is not None:
+        # Check if selection is directly an index
+        if isinstance(selection, (int, list)):
+            st.session_state.selected_row_index = selection[0] if isinstance(selection, list) else selection
+        # Check if selection has rows attribute (Streamlit < 1.32.0)
+        elif hasattr(selection, 'rows') and selection.rows:
+            st.session_state.selected_row_index = selection.rows[0]
+        # Check if selection has any other attributes that might contain the row index
+        elif hasattr(selection, 'row_index'):
+            st.session_state.selected_row_index = selection.row_index
+        # If we can't determine the selection, set it to None
+        else:
+            st.session_state.selected_row_index = None
     else:
         st.session_state.selected_row_index = None
 
@@ -149,16 +161,27 @@ with tab1:
         st.write(f"Total columns: {len(data.columns)}")
         
         # Display dataframe with selection option - Fixed callback issue
-        selection = st.dataframe(
+        # Using a simpler approach that's compatible with all Streamlit versions
+        st.dataframe(
             data,
             use_container_width=True,
-            column_config={"_index": st.column_config.Column(disabled=True)},
-            selection_mode="single"
+            column_config={"_index": st.column_config.Column(disabled=True)}
         )
         
-        # Handle selection change safely
-        if selection:
-            handle_selection(selection)
+        # Add a separate selection mechanism that's more reliable
+        if data is not None and not data.empty:
+            # Create a selectbox with row indices
+            row_options = list(range(len(data)))
+            row_labels = [f"Row {i}: {data.iloc[i, 0]}" for i in row_options]
+            selected_index = st.selectbox(
+                "Select a row to view details:",
+                options=row_options,
+                format_func=lambda x: row_labels[x],
+                index=st.session_state.selected_row_index if st.session_state.selected_row_index is not None else 0
+            )
+            
+            # Update the session state
+            st.session_state.selected_row_index = selected_index
         
         # Display column information
         st.subheader("Column Information")
