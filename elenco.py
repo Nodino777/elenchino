@@ -152,23 +152,17 @@ with tab1:
         st.write(f"Total rows: {len(data)}")
         st.write(f"Total columns: {len(data.columns)}")
         
-        # Add selection functionality to the dataframe
-        # We'll use a callback to track which row is selected
-        def on_row_select(selected_rows):
-            if selected_rows:
-                st.session_state.selected_row_index = selected_rows[0]
-        
-        # Display all data with pagination and selection capability
-        selected_rows = st.dataframe(
+        # Display dataframe with selection option
+        selection = st.dataframe(
             data,
             use_container_width=True,
             column_config={"_index": st.column_config.Column(disabled=True)},
             selection="single"
         )
         
-        # Update selected row when the selection changes
-        if selected_rows:
-            st.session_state.selected_row_index = selected_rows
+        # Update selected row when selection changes
+        if selection:
+            st.session_state.selected_row_index = selection
         
         # Display column information
         st.subheader("Column Information")
