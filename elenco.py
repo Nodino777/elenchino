@@ -1,35 +1,39 @@
 import streamlit as st
-import pandas as pd
-import os
 
-# Set page configuration first (must be the first Streamlit command)
-
-
-# Try importing visualization libraries, but provide fallbacks if not available
-try:
-    import plotly.express as px
-except ImportError:
-    st.error("Plotly is not installed. Some visualizations will not be available.")
-    px = None
-
-try:
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-except ImportError:
-    st.error("Matplotlib/Seaborn are not installed. Some visualizations will not be available.")
-    plt = None
-    sns = None
-
-try:
-    import chardet
-except ImportError:
-    # If chardet is not available, we'll use a simpler approach for encoding
-    chardet = None
+# Set page configuration as the first Streamlit command
 st.set_page_config(
     page_title="CSV Data Viewer & Analyzer",
     page_icon="📊",
     layout="wide"
 )
+
+# Now import other libraries
+import pandas as pd
+import os
+
+# Variables to track library availability
+px = None
+plt = None
+sns = None
+chardet = None
+
+# Import optional libraries with proper error handling
+try:
+    import plotly.express as px
+except ImportError:
+    st.warning("Plotly is not installed. Some visualizations will not be available.")
+
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+except ImportError:
+    st.warning("Matplotlib/Seaborn are not installed. Some visualizations will not be available.")
+
+try:
+    import chardet
+except ImportError:
+    # If chardet is not available, we'll use a simpler approach for encoding
+    pass
 
 # Function to detect encoding and read CSV properly
 @st.cache_data
@@ -156,15 +160,31 @@ with tab2:
                 # Create columns for charts
                 col1, col2 = st.columns(2)
                 
-                # Here should be code to create visualizations in col1 and col2
-                # The code appears to be missing from the original file
+                # Visualization in column 1
                 with col1:
                     st.write("Visualization 1")
-                    # Add your visualization code here
-                    
+                    # Add visualization code here based on the libraries available
+                    if px:
+                        try:
+                            # Example visualization - adjust based on your data
+                            st.write("Sample Plotly chart would appear here")
+                        except Exception as e:
+                            st.warning(f"Could not create visualization: {str(e)}")
+                    else:
+                        st.info("Plotly is required for this visualization")
+                
+                # Visualization in column 2
                 with col2:
                     st.write("Visualization 2")
-                    # Add your visualization code here
+                    # Add visualization code here based on the libraries available
+                    if plt and sns:
+                        try:
+                            # Example visualization - adjust based on your data
+                            st.write("Sample Matplotlib/Seaborn chart would appear here")
+                        except Exception as e:
+                            st.warning(f"Could not create visualization: {str(e)}")
+                    else:
+                        st.info("Matplotlib/Seaborn are required for this visualization")
                 
                 # Summary statistics
                 st.subheader("Summary Statistics")
