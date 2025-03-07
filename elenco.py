@@ -18,6 +18,17 @@ sns = None
 chardet = None
 
 # Import optional libraries with proper error handling
+#try:
+#    import plotly.express as px
+#except ImportError:
+#    st.warning("Plotly is not installed. Some visualizations will not be available.")
+#
+#try:
+#    import matplotlib.pyplot as plt
+#    import seaborn as sns
+#except ImportError:
+#    st.warning("Matplotlib/Seaborn are not installed. Some visualizations will not be available.")
+
 try:
     import chardet
 except ImportError:
@@ -106,33 +117,14 @@ def color_cells(series):
             styles.append('')
     return styles
 
-# Initialize session state for selected row if not already done
-if 'selected_row_index' not in st.session_state:
-    st.session_state.selected_row_index = None
-
-# Function to handle selection callback
-def handle_selection(selection):
-    # Handle different types of selection objects safely
-    if selection is not None:
-        # Check if selection is directly an index
-        if isinstance(selection, (int, list)):
-            st.session_state.selected_row_index = selection[0] if isinstance(selection, list) else selection
-        # Check if selection has rows attribute (Streamlit < 1.32.0)
-        elif hasattr(selection, 'rows') and selection.rows:
-            st.session_state.selected_row_index = selection.rows[0]
-        # Check if selection has any other attributes that might contain the row index
-        elif hasattr(selection, 'row_index'):
-            st.session_state.selected_row_index = selection.row_index
-        # If we can't determine the selection, set it to None
-        else:
-            st.session_state.selected_row_index = None
-    else:
-        st.session_state.selected_row_index = None
+# Initialize session state for filter if not already done
+if 'filter_value' not in st.session_state:
+    st.session_state.filter_value = None
 
 # Main app title
 st.title("Elenco stato PCG delle aziende")
 
-# Colonne che saranno mostrate nel "Report Dettagliato" del tab3 e nel dettaglio della row selezionata nel tab2
+# Colonne che saranno mostrate nel "Report Dettagliato" del tab3
 SELECTED_COLUMNS = [
     'SAU_2024',  # Changed to underscore to match DataFrame column
     'ESONERO BCAA7',
@@ -147,7 +139,7 @@ file_path = "DOMANDE_2025.CSV"  # Replace with the actual path if different
 data, error = load_data(file_path)
 
 # Create tabs
-tab1, tab2, tab3 = st.tabs(["Data Table", "Row Detail", "Report Dettagliato"])
+tab1, tab2, tab3 = st.tabs(["Data Table", "Filtered Report", "Report Dettagliato"])
 
 # Tab 1: Data Table
 with tab1:
@@ -160,110 +152,93 @@ with tab1:
         st.write(f"Total rows: {len(data)}")
         st.write(f"Total columns: {len(data.columns)}")
         
-        # Display dataframe with selection option - Fixed callback issue
-        # Using a simpler approach that's compatible with all Streamlit versions
-        st.dataframe(
-            data,
-            use_container_width=True,
-            column_config={"_index": st.column_config.Column(disabled=True)}
-        )
-        
-        # Add a separate selection mechanism that's more reliable
-        if data is not None and not data.empty:
-            # Create a selectbox with row indices
-            row_options = list(range(len(data)))
-            row_labels = [f"Row {i}: {data.iloc[i, 0]}" for i in row_options]
-            selected_index = st.selectbox(
-                "Select a row to view details:",
-                options=row_options,
-                format_func=lambda x: row_labels[x],
-                index=st.session_state.selected_row_index if st.session_state.selected_row_index is not None else 0
-            )
-            
-            # Update the session state
-            st.session_state.selected_row_index = selected_index
+        # Display all data with pagination
+        st.dataframe(data, use_container_width=True)
         
         # Display column information
-        st.subheader("Column Information")
-        for i, col in enumerate(data.columns):
-            st.write(f"Column {i+1}: {col} - Type: {data[col].dtype}")
+#        st.subheader("Column Information")
+#        for i, col in enumerate(data.columns):
+#            st.write(f"Column {i+1}: {col} - Type: {data[col].dtype}")
     else:
         st.warning("No data available. Please check the file path.")
 
-# Tab 2: Row Detail (formerly Filtered Report)
+# Tab 2: Filtered Report
 with tab2:
     if error:
         st.error(error)
     elif data is not None:
-        st.subheader("Selected Row Detail")
+        st.subheader("Filtered Data Report")
         
-        if st.session_state.selected_row_index is not None:
-            try:
-                # Get the selected row
-                selected_row = data.iloc[st.session_state.selected_row_index]
+        # Check if we have at least 3 columns
+        if len(data.columns) >= 3:
+            # Get the name of the third column
+            third_column = data.columns[2]
+            
+            # Get unique values from the third column
+            unique_values = data[third_column].unique()
+            
+            # Create filter in sidebar
+            st.sidebar.header("Filter Options")
+            selected_value = st.sidebar.selectbox(
+                f"Select a value from {third_column}",
+                options=unique_values,
+                key="filter_selectbox"
+            )
+            
+            # Filter the dataframe based on selection
+            filtered_data = data[data[third_column] == selected_value]
+            
+            # Show filtered data
+            st.write(f"Showing data for {third_column} = {selected_value}")
+            st.write(f"Number of records: {len(filtered_data)}")
+            
+            # Display the filtered table
+            st.dataframe(filtered_data, use_container_width=True)
+            
+            # Create visualizations
+            st.subheader("Visualizations")
+            
+            # Only proceed if we have filtered data
+            if not filtered_data.empty:
+                # Create columns for charts
+                col1, col2 = st.columns(2)
                 
-                # Display primary information about the selected row
-                # Assuming the first column might be an ID or a key field
-                st.write(f"Selected Row ID: {selected_row.iloc[0]}")
-                
-                # Create a dictionary of the specific columns requested
-                row_details = {}
-                for col in SELECTED_COLUMNS:
-                    if col in data.columns:
-                        row_details[col] = selected_row[col]
+                # Visualization in column 1
+                with col1:
+                    st.write("Visualization 1")
+                    # Add visualization code here based on the libraries available
+                    if px:
+                        try:
+                            # Example visualization - adjust based on your data
+                            st.write("Sample Plotly chart would appear here")
+                        except Exception as e:
+                            st.warning(f"Could not create visualization: {str(e)}")
                     else:
-                        row_details[col] = "Nessun dato trovato nel dataset"
+                        st.info("Plotly is required for this visualization")
                 
-                # Display the specific columns in a more visual format
-                st.subheader("Key Information")
-                for col, value in row_details.items():
-                    # Determine styling based on value
-                    if isinstance(value, str):
-                        value_lower = value.lower()
-                        if 'ok' in value_lower or 'completato' in value_lower or 'valido' in value_lower:
-                            color = "lightgreen"
-                        elif 'scadenza' in value_lower or 'attenzione' in value_lower or 'in corso' in value_lower:
-                            color = "#FFEB9C"  # Light yellow
-                        elif 'no' in value_lower or 'scaduto' in value_lower or 'error' in value_lower:
-                            color = "#FFC7CE"  # Light red
-                        else:
-                            color = "white"
-                    elif isinstance(value, (int, float)):
-                        if value > 0:
-                            color = "lightgreen"
-                        elif value < 0:
-                            color = "#FFC7CE"  # Light red
-                        else:
-                            color = "lightgray"
+                # Visualization in column 2
+                with col2:
+                    st.write("Visualization 2")
+                    # Add visualization code here based on the libraries available
+                    if plt and sns:
+                        try:
+                            # Example visualization - adjust based on your data
+                            st.write("Sample Matplotlib/Seaborn chart would appear here")
+                        except Exception as e:
+                            st.warning(f"Could not create visualization: {str(e)}")
                     else:
-                        color = "white"
-                    
-                    # Display information with styling
-                    st.markdown(
-                        f"<div style='background-color: {color}; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>"
-                        f"<strong>{col}:</strong> {value}"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
+                        st.info("Matplotlib/Seaborn are required for this visualization")
                 
-                # Display all information of the row in a expander
-                with st.expander("View all information for this row"):
-                    # Convert series to dataframe for better display
-                    row_df = pd.DataFrame([selected_row])
-                    st.dataframe(row_df, use_container_width=True)
-                    
-                    # Add option to download this row
-                    csv = row_df.to_csv(index=False)
-                    st.download_button(
-                        label="Download row data as CSV",
-                        data=csv,
-                        file_name="row_detail.csv",
-                        mime="text/csv",
-                    )
-            except Exception as e:
-                st.error(f"Error displaying row details: {str(e)}")
+                # Summary statistics
+                st.subheader("Summary Statistics")
+                try:
+                    st.write(filtered_data.describe())
+                except Exception as e:
+                    st.error(f"Error generating summary statistics: {str(e)}")
+            else:
+                st.warning("No data matches the selected filter.")
         else:
-            st.info("Please select a row from the 'Data Table' tab to view its details here.")
+            st.warning("The CSV file has fewer than 3 columns. Please select a different file.")
     else:
         st.warning("No data available. Please check the file path.")
 
@@ -280,38 +255,13 @@ with tab3:
         if available_columns:
             # 1. Select only the columns that exist in the dataframe
             try:
-                filtered_df = data[available_columns].copy()  # Added .copy() to avoid SettingWithCopyWarning
+                filtered_df = data[available_columns]
                 
-                # Create a styled version for display
-                def apply_style_to_df(df):
-                    # Create a copy of the dataframe to prevent modifying the original
-                    styled_df = df.copy()
-                    
-                    # Apply conditional styling
-                    for col in styled_df.columns:
-                        for i, val in enumerate(styled_df[col]):
-                            if pd.isna(val):
-                                styled_df.at[i, col] = f"<div style='background-color: lightgray'>{val}</div>"
-                            elif isinstance(val, str):
-                                val_lower = val.lower()
-                                if 'ok' in val_lower or 'completato' in val_lower or 'valido' in val_lower:
-                                    styled_df.at[i, col] = f"<div style='background-color: lightgreen'>{val}</div>"
-                                elif 'scadenza' in val_lower or 'attenzione' in val_lower or 'in corso' in val_lower:
-                                    styled_df.at[i, col] = f"<div style='background-color: #FFEB9C'>{val}</div>"
-                                elif 'no' in val_lower or 'scaduto' in val_lower or 'error' in val_lower:
-                                    styled_df.at[i, col] = f"<div style='background-color: #FFC7CE'>{val}</div>"
-                            elif isinstance(val, (int, float)):
-                                if val > 0:
-                                    styled_df.at[i, col] = f"<div style='background-color: lightgreen'>{val}</div>"
-                                elif val < 0:
-                                    styled_df.at[i, col] = f"<div style='background-color: #FFC7CE'>{val}</div>"
-                                else:
-                                    styled_df.at[i, col] = f"<div style='background-color: lightgray'>{val}</div>"
-                    
-                    return styled_df
+                # 2. Apply styling to color the cells in the selected columns
+                # Note: st.dataframe doesn't support pandas styling directly, so we'll use a different approach
+                st.write("Report showing selected columns with color-coding:")
                 
                 # Display the dataframe
-                st.write("Report showing selected columns with color-coding:")
                 st.dataframe(filtered_df, use_container_width=True)
                 
                 # Explain the color coding
