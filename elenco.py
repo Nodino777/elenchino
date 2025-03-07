@@ -2,7 +2,7 @@ import streamlit as st
 
 # Set page configuration as the first Streamlit command
 st.set_page_config(
-    page_title="CSV Data Viewer & Analyzer",
+    page_title="Elenco stato PCG delle aziende",
     page_icon="📊",
     layout="wide"
 )
