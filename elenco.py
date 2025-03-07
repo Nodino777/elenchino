@@ -212,7 +212,7 @@ with tab2:
                     if col in data.columns:
                         row_details[col] = selected_row[col]
                     else:
-                        row_details[col] = "Column not found in dataset"
+                        row_details[col] = "Nessun dato trovato nel dataset"
                 
                 # Display the specific columns in a more visual format
                 st.subheader("Key Information")
