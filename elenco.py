@@ -84,12 +84,49 @@ def load_data(file_path):
     else:
         return None, f"File {file_path} not found."
 
+# Define the color_cells function that was missing in the original code
+def color_cells(series):
+    """
+    Apply conditional styling to dataframe cells.
+    Returns a list of CSS styles for each cell in the series.
+    """
+    styles = []
+    for val in series:
+        if pd.isna(val):
+            styles.append('background-color: lightgray')
+        elif isinstance(val, str):
+            # Style based on certain text values
+            val_lower = val.lower()
+            if 'ok' in val_lower or 'completato' in val_lower or 'valido' in val_lower:
+                styles.append('background-color: lightgreen')
+            elif 'scadenza' in val_lower or 'attenzione' in val_lower or 'in corso' in val_lower:
+                styles.append('background-color: #FFEB9C')  # Light yellow
+            elif 'no' in val_lower or 'scaduto' in val_lower or 'error' in val_lower:
+                styles.append('background-color: #FFC7CE')  # Light red
+            else:
+                styles.append('')
+        elif isinstance(val, (int, float)):
+            # Style based on numeric values
+            if val > 0:
+                styles.append('background-color: lightgreen')
+            elif val < 0:
+                styles.append('background-color: #FFC7CE')  # Light red
+            else:
+                styles.append('background-color: lightgray')
+        else:
+            styles.append('')
+    return styles
+
 # Initialize session state for filter if not already done
 if 'filter_value' not in st.session_state:
     st.session_state.filter_value = None
 
 # Main app title
 st.title("Elenco stato PCG delle aziende")
+
+# Sidebar with file upload option
+st.sidebar.header("File Selection")
+uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
 
 # Colonne che saranno mostrate nel "Report Dettagliato" del tab3
 SELECTED_COLUMNS = [
@@ -102,8 +139,14 @@ SELECTED_COLUMNS = [
 ]
 
 # Load data
-file_path = "DOMANDE_2025.CSV"  # Replace with the actual path if different
-data, error = load_data(file_path)
+if uploaded_file is not None:
+    # If a file is uploaded, use that
+    data = pd.read_csv(uploaded_file)
+    error = None
+else:
+    # Otherwise, use the default file
+    file_path = "DOMANDE_2025.CSV"  # Default file path
+    data, error = load_data(file_path)
 
 # Create tabs
 tab1, tab2, tab3 = st.tabs(["Data Table", "Filtered Report", "Report Dettagliato"])
@@ -119,15 +162,37 @@ with tab1:
         st.write(f"Total rows: {len(data)}")
         st.write(f"Total columns: {len(data.columns)}")
         
-        # Display all data with pagination
-        st.dataframe(data, use_container_width=True)
+        # Add search functionality
+        search_term = st.text_input("Search in data:")
+        if search_term:
+            # Search in all columns that are string type
+            mask = False
+            for col in data.columns:
+                if data[col].dtype == 'object':  # Only search in string columns
+                    mask = mask | data[col].astype(str).str.contains(search_term, case=False, na=False)
+            
+            filtered_data = data[mask]
+            st.write(f"Found {len(filtered_data)} matches for '{search_term}'")
+            st.dataframe(filtered_data, use_container_width=True)
+        else:
+            # Display all data with pagination
+            st.dataframe(data, use_container_width=True)
         
         # Display column information
-        st.subheader("Column Information")
-        for i, col in enumerate(data.columns):
-            st.write(f"Column {i+1}: {col} - Type: {data[col].dtype}")
+        with st.expander("Column Information"):
+            for i, col in enumerate(data.columns):
+                st.write(f"Column {i+1}: {col} - Type: {data[col].dtype}")
+                
+        # Add download button for the data
+        csv = data.to_csv(index=False)
+        st.download_button(
+            label="Download data as CSV",
+            data=csv,
+            file_name="filtered_data.csv",
+            mime="text/csv",
+        )
     else:
-        st.warning("No data available. Please check the file path.")
+        st.warning("No data available. Please check the file path or upload a file.")
 
 # Tab 2: Filtered Report
 with tab2:
@@ -141,22 +206,28 @@ with tab2:
             # Get the name of the third column
             third_column = data.columns[2]
             
-            # Get unique values from the third column
-            unique_values = data[third_column].unique()
+            # Allow user to select a column to filter by
+            filter_column = st.selectbox(
+                "Select a column to filter by:",
+                options=data.columns,
+                index=2  # Default to the third column
+            )
             
-            # Create filter in sidebar
-            st.sidebar.header("Filter Options")
-            selected_value = st.sidebar.selectbox(
-                f"Select a value from {third_column}",
+            # Get unique values from the selected column
+            unique_values = data[filter_column].dropna().unique()
+            
+            # Create filter
+            selected_value = st.selectbox(
+                f"Select a value from {filter_column}",
                 options=unique_values,
                 key="filter_selectbox"
             )
             
             # Filter the dataframe based on selection
-            filtered_data = data[data[third_column] == selected_value]
+            filtered_data = data[data[filter_column] == selected_value]
             
             # Show filtered data
-            st.write(f"Showing data for {third_column} = {selected_value}")
+            st.write(f"Showing data for {filter_column} = {selected_value}")
             st.write(f"Number of records: {len(filtered_data)}")
             
             # Display the filtered table
@@ -176,8 +247,17 @@ with tab2:
                     # Add visualization code here based on the libraries available
                     if px:
                         try:
-                            # Example visualization - adjust based on your data
-                            st.write("Sample Plotly chart would appear here")
+                            # Select numeric columns for visualization
+                            numeric_cols = filtered_data.select_dtypes(include=['number']).columns.tolist()
+                            if numeric_cols:
+                                select_col = st.selectbox("Select column for pie chart:", numeric_cols)
+                                if not filtered_data[select_col].empty:
+                                    fig = px.pie(filtered_data, values=select_col, title=f'Distribution of {select_col}')
+                                    st.plotly_chart(fig, use_container_width=True)
+                                else:
+                                    st.info("No data available for selected column")
+                            else:
+                                st.info("No numeric columns available for visualization")
                         except Exception as e:
                             st.warning(f"Could not create visualization: {str(e)}")
                     else:
@@ -189,8 +269,19 @@ with tab2:
                     # Add visualization code here based on the libraries available
                     if plt and sns:
                         try:
-                            # Example visualization - adjust based on your data
-                            st.write("Sample Matplotlib/Seaborn chart would appear here")
+                            numeric_cols = filtered_data.select_dtypes(include=['number']).columns.tolist()
+                            if numeric_cols:
+                                select_col = st.selectbox("Select column for bar chart:", numeric_cols, key="bar_chart_select")
+                                if len(filtered_data[select_col]) > 0:
+                                    fig, ax = plt.subplots()
+                                    sns.barplot(y=filtered_data[select_col], x=filtered_data.index, ax=ax)
+                                    plt.xticks(rotation=45)
+                                    plt.title(f'Bar chart of {select_col}')
+                                    st.pyplot(fig)
+                                else:
+                                    st.info("No data available for selected column")
+                            else:
+                                st.info("No numeric columns available for visualization")
                         except Exception as e:
                             st.warning(f"Could not create visualization: {str(e)}")
                     else:
@@ -199,29 +290,75 @@ with tab2:
                 # Summary statistics
                 st.subheader("Summary Statistics")
                 try:
-                    st.write(filtered_data.describe())
+                    numeric_filtered = filtered_data.select_dtypes(include=['number'])
+                    if not numeric_filtered.empty:
+                        st.write(numeric_filtered.describe())
+                    else:
+                        st.info("No numeric columns available for summary statistics")
                 except Exception as e:
                     st.error(f"Error generating summary statistics: {str(e)}")
+                
+                # Add download button for the filtered data
+                csv = filtered_data.to_csv(index=False)
+                st.download_button(
+                    label="Download filtered data as CSV",
+                    data=csv,
+                    file_name=f"filtered_{filter_column}_{selected_value}.csv",
+                    mime="text/csv",
+                )
             else:
                 st.warning("No data matches the selected filter.")
         else:
             st.warning("The CSV file has fewer than 3 columns. Please select a different file.")
     else:
-        st.warning("No data available. Please check the file path.")
+        st.warning("No data available. Please check the file path or upload a file.")
 
-# Tab 2: Report Dettagliato
+# Tab 3: Report Dettagliato
 with tab3:
-    st.header("Report Dettagliato")
-
-    # 1. Select only the desired columns
-    filtered_df = data[SELECTED_COLUMNS]
-
-    # 2. Apply styling to color the cells in the selected columns
-    styled_df = filtered_df.style.apply(color_cells, subset=SELECTED_COLUMNS)
-
-    # 3. Display the styled and filtered dataframe
-    st.dataframe(styled_df)
+    if error:
+        st.error(error)
+    elif data is not None:
+        st.header("Report Dettagliato")
+        
+        # Check if all the selected columns exist in the dataframe
+        available_columns = [col for col in SELECTED_COLUMNS if col in data.columns]
+        
+        if available_columns:
+            # 1. Select only the columns that exist in the dataframe
+            try:
+                filtered_df = data[available_columns]
+                
+                # 2. Apply styling to color the cells in the selected columns
+                # Note: st.dataframe doesn't support pandas styling directly, so we'll use a different approach
+                st.write("Report showing selected columns with color-coding:")
+                
+                # Display the dataframe
+                st.dataframe(filtered_df, use_container_width=True)
+                
+                # Explain the color coding
+                st.write("Color coding legend:")
+                st.markdown("""
+                - 🟢 Green: Positive values, "OK", "Completato", "Valido" statuses
+                - 🟡 Yellow: "In scadenza", "Attenzione", "In corso" statuses
+                - 🔴 Red: Negative values, "No", "Scaduto", "Error" statuses
+                - ⚪ Gray: Zero values or empty cells
+                """)
+                
+                # Add download button for the detailed report
+                csv = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label="Download detailed report as CSV",
+                    data=csv,
+                    file_name="detailed_report.csv",
+                    mime="text/csv",
+                )
+            except Exception as e:
+                st.error(f"Error generating detailed report: {str(e)}")
+        else:
+            st.warning(f"None of the selected columns {SELECTED_COLUMNS} were found in the data. Available columns are: {', '.join(data.columns)}")
+    else:
+        st.warning("No data available. Please check the file path or upload a file.")
     
 # Footer
 st.markdown("---")
-st.markdown("Elenco stato PCG delle aziende | Built with Simpatia")
+st.markdown("Elenco stato PCG delle aziende | Built with Streamlit")
