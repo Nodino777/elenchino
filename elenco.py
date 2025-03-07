@@ -153,16 +153,12 @@ with tab1:
         st.write(f"Total columns: {len(data.columns)}")
         
         # Display dataframe with selection option
-        selection = st.dataframe(
+        st.dataframe(
             data,
             use_container_width=True,
             column_config={"_index": st.column_config.Column(disabled=True)},
-            selection="single"
+            on_select=lambda selection: st.session_state.update(selected_row_index=selection.rows[0] if selection and selection.rows else None)
         )
-        
-        # Update selected row when selection changes
-        if selection:
-            st.session_state.selected_row_index = selection
         
         # Display column information
         st.subheader("Column Information")
