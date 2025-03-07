@@ -92,7 +92,7 @@ if 'filter_value' not in st.session_state:
 st.title("Elenco stato PCG delle aziende")
 
 # Colonne che saranno mostrate nel "Report Dettagliato" del tab3
-daterelli = pd.DataFrame(df)
+daterelli = pd.DataFrame(data)
 SELECTED_COLUMNS = [
     'SAU 2024',
     'ESONERO BCAA7',
