@@ -50,7 +50,7 @@ if 'filter_value' not in st.session_state:
 st.title("CSV Data Viewer & Analyzer")
 
 # Load data
-file_path = "DOMANDE_2025.CSV"  # Replace with the actual path if different
+file_path = "https://github.com/Nodino777/elenchino/blob/4787ff718a0f50f861801674377d9c4ee1dd1446/DOMANDE_2025.CSV"  # Replace with the actual path if different
 data, error = load_data(file_path)
 
 # Create tabs
