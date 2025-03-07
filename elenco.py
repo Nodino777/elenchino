@@ -1,10 +1,27 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
 import os
-import chardet
+
+# Try importing visualization libraries, but provide fallbacks if not available
+try:
+    import plotly.express as px
+except ImportError:
+    st.error("Plotly is not installed. Some visualizations will not be available.")
+    px = None
+
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+except ImportError:
+    st.error("Matplotlib/Seaborn are not installed. Some visualizations will not be available.")
+    plt = None
+    sns = None
+
+try:
+    import chardet
+except ImportError:
+    # If chardet is not available, we'll use a simpler approach for encoding
+    chardet = None
 
 # Set page configuration
 st.set_page_config(
@@ -18,10 +35,19 @@ st.set_page_config(
 def load_data(file_path):
     # Detect encoding if file exists
     if os.path.exists(file_path):
-        with open(file_path, 'rb') as f:
-            rawdata = f.read()
-            result = chardet.detect(rawdata)
-            encoding = result['encoding']
+        # Try to detect encoding with chardet if available
+        if chardet:
+            try:
+                with open(file_path, 'rb') as f:
+                    rawdata = f.read()
+                    result = chardet.detect(rawdata)
+                    encoding = result['encoding']
+            except Exception:
+                # Fallback to common encodings
+                encoding = 'cp1252'  # Default to Windows encoding for European languages
+        else:
+            # If chardet is not available, try common encodings
+            encoding = 'cp1252'  # Default to Windows encoding for European languages
         
         # Try different delimiters
         for delimiter in [';', ',', '\t', '|']:
@@ -30,12 +56,23 @@ def load_data(file_path):
                 # If successful and has data, return the dataframe
                 if not df.empty and len(df.columns) > 1:
                     return df, None
-            except Exception as e:
+            except Exception:
                 pass
-                
-        # If all delimiters fail, try with default
+        
+        # If all previous attempts fail, try a series of common encodings
+        encodings = ['utf-8', 'latin1', 'iso-8859-1', 'utf-16']
+        for enc in encodings:
+            if enc != encoding:  # Skip the one we already tried
+                try:
+                    df = pd.read_csv(file_path, encoding=enc)
+                    if not df.empty:
+                        return df, None
+                except Exception:
+                    pass
+                    
+        # If all else fails, try with default pandas behavior
         try:
-            df = pd.read_csv(file_path, encoding=encoding)
+            df = pd.read_csv(file_path)
             return df, None
         except Exception as e:
             return None, f"Error reading CSV: {str(e)}"
@@ -118,41 +155,7 @@ with tab2:
                 # Create columns for charts
                 col1, col2 = st.columns(2)
                 
-                with col1:
-                    try:
-                        # Try to create a bar chart of counts by another column
-                        # Find a categorical column to plot
-                        categorical_cols = filtered_data.select_dtypes(include=['object', 'category']).columns
-                        numeric_cols = filtered_data.select_dtypes(include=['number']).columns
-                        
-                        if len(categorical_cols) > 0 and categorical_cols[0] != third_column:
-                            plot_col = categorical_cols[0]
-                            fig = px.histogram(filtered_data, x=plot_col, title=f"Count by {plot_col}")
-                            st.plotly_chart(fig, use_container_width=True)
-                        elif len(categorical_cols) > 1:
-                            plot_col = categorical_cols[1]
-                            fig = px.histogram(filtered_data, x=plot_col, title=f"Count by {plot_col}")
-                            st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error creating bar chart: {str(e)}")
-                
-                with col2:
-                    try:
-                        # If we have numeric columns, create a boxplot
-                        if len(numeric_cols) > 0:
-                            fig = px.box(filtered_data, y=numeric_cols[0], title=f"Distribution of {numeric_cols[0]}")
-                            st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error creating box plot: {str(e)}")
-                
-                # Create a third visualization - scatter plot if possible
-                try:
-                    if len(numeric_cols) >= 2:
-                        fig = px.scatter(filtered_data, x=numeric_cols[0], y=numeric_cols[1], 
-                                         title=f"Scatter plot: {numeric_cols[0]} vs {numeric_cols[1]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error creating scatter plot: {str(e)}")
+ror(f"Error creating scatter plot: {str(e)}")
                 
                 # Summary statistics
                 st.subheader("Summary Statistics")
