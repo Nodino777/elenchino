@@ -91,12 +91,22 @@ if 'filter_value' not in st.session_state:
 # Main app title
 st.title("Elenco stato PCG delle aziende")
 
+# Colonne che saranno mostrate nel "Report Dettagliato" del tab3
+SELECTED_COLUMNS = [
+    'SAU 2024',
+    'ESONERO BCAA7',
+    'STIMA SOLO PAC 2025',
+    'CONTRATTI IN SCADENZA',
+    'STATO FASCICOLO',
+    'STATO PAC'
+]
+
 # Load data
 file_path = "DOMANDE_2025.CSV"  # Replace with the actual path if different
 data, error = load_data(file_path)
 
 # Create tabs
-tab1, tab2 = st.tabs(["Data Table", "Filtered Report"])
+tab1, tab2, tab3 = st.tabs(["Data Table", "Filtered Report", "Report Dettagliato"])
 
 # Tab 1: Data Table
 with tab1:
@@ -199,6 +209,19 @@ with tab2:
     else:
         st.warning("No data available. Please check the file path.")
 
+# Tab 2: Report Dettagliato
+with tab3:
+    st.header("Report Dettagliato")
+
+    # 1. Select only the desired columns
+    filtered_df = df[SELECTED_COLUMNS]
+
+    # 2. Apply styling to color the cells in the selected columns
+    styled_df = filtered_df.style.apply(color_cells, subset=SELECTED_COLUMNS)
+
+    # 3. Display the styled and filtered dataframe
+    st.dataframe(styled_df)
+    
 # Footer
 st.markdown("---")
 st.markdown("Elenco stato PCG delle aziende | Built with Simpatia")
