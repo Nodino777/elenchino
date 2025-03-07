@@ -92,6 +92,7 @@ if 'filter_value' not in st.session_state:
 st.title("Elenco stato PCG delle aziende")
 
 # Colonne che saranno mostrate nel "Report Dettagliato" del tab3
+daterelli = pd.DataFrame(df)
 SELECTED_COLUMNS = [
     'SAU 2024',
     'ESONERO BCAA7',
@@ -214,7 +215,7 @@ with tab3:
     st.header("Report Dettagliato")
 
     # 1. Select only the desired columns
-    filtered_df = df[SELECTED_COLUMNS]
+    filtered_df = daterelli[SELECTED_COLUMNS]
 
     # 2. Apply styling to color the cells in the selected columns
     styled_df = filtered_df.style.apply(color_cells, subset=SELECTED_COLUMNS)
