@@ -84,6 +84,39 @@ def load_data(file_path):
     else:
         return None, f"File {file_path} not found."
 
+# Define the color_cells function that was missing in the original code
+def color_cells(series):
+    """
+    Apply conditional styling to dataframe cells.
+    Returns a list of CSS styles for each cell in the series.
+    """
+    styles = []
+    for val in series:
+        if pd.isna(val):
+            styles.append('background-color: lightgray')
+        elif isinstance(val, str):
+            # Style based on certain text values
+            val_lower = val.lower()
+            if 'ok' in val_lower or 'completato' in val_lower or 'valido' in val_lower:
+                styles.append('background-color: lightgreen')
+            elif 'scadenza' in val_lower or 'attenzione' in val_lower or 'in corso' in val_lower:
+                styles.append('background-color: #FFEB9C')  # Light yellow
+            elif 'no' in val_lower or 'scaduto' in val_lower or 'error' in val_lower:
+                styles.append('background-color: #FFC7CE')  # Light red
+            else:
+                styles.append('')
+        elif isinstance(val, (int, float)):
+            # Style based on numeric values
+            if val > 0:
+                styles.append('background-color: lightgreen')
+            elif val < 0:
+                styles.append('background-color: #FFC7CE')  # Light red
+            else:
+                styles.append('background-color: lightgray')
+        else:
+            styles.append('')
+    return styles
+
 # Initialize session state for filter if not already done
 if 'filter_value' not in st.session_state:
     st.session_state.filter_value = None
