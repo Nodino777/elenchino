@@ -18,17 +18,6 @@ sns = None
 chardet = None
 
 # Import optional libraries with proper error handling
-#try:
-#    import plotly.express as px
-#except ImportError:
-#    st.warning("Plotly is not installed. Some visualizations will not be available.")
-#
-#try:
-#    import matplotlib.pyplot as plt
-#    import seaborn as sns
-#except ImportError:
-#    st.warning("Matplotlib/Seaborn are not installed. Some visualizations will not be available.")
-
 try:
     import chardet
 except ImportError:
@@ -121,6 +110,13 @@ def color_cells(series):
 if 'selected_row_index' not in st.session_state:
     st.session_state.selected_row_index = None
 
+# Function to handle selection callback
+def handle_selection(selection):
+    if selection and hasattr(selection, 'rows') and selection.rows:
+        st.session_state.selected_row_index = selection.rows[0]
+    else:
+        st.session_state.selected_row_index = None
+
 # Main app title
 st.title("Elenco stato PCG delle aziende")
 
@@ -152,13 +148,17 @@ with tab1:
         st.write(f"Total rows: {len(data)}")
         st.write(f"Total columns: {len(data.columns)}")
         
-        # Display dataframe with selection option
-        st.dataframe(
+        # Display dataframe with selection option - Fixed callback issue
+        selection = st.dataframe(
             data,
             use_container_width=True,
             column_config={"_index": st.column_config.Column(disabled=True)},
-            on_select=lambda selection: st.session_state.update(selected_row_index=selection.rows[0] if selection and selection.rows else None)
+            selection_mode="single"
         )
+        
+        # Handle selection change safely
+        if selection:
+            handle_selection(selection)
         
         # Display column information
         st.subheader("Column Information")
@@ -257,13 +257,38 @@ with tab3:
         if available_columns:
             # 1. Select only the columns that exist in the dataframe
             try:
-                filtered_df = data[available_columns]
+                filtered_df = data[available_columns].copy()  # Added .copy() to avoid SettingWithCopyWarning
                 
-                # 2. Apply styling to color the cells in the selected columns
-                # Note: st.dataframe doesn't support pandas styling directly, so we'll use a different approach
-                st.write("Report showing selected columns with color-coding:")
+                # Create a styled version for display
+                def apply_style_to_df(df):
+                    # Create a copy of the dataframe to prevent modifying the original
+                    styled_df = df.copy()
+                    
+                    # Apply conditional styling
+                    for col in styled_df.columns:
+                        for i, val in enumerate(styled_df[col]):
+                            if pd.isna(val):
+                                styled_df.at[i, col] = f"<div style='background-color: lightgray'>{val}</div>"
+                            elif isinstance(val, str):
+                                val_lower = val.lower()
+                                if 'ok' in val_lower or 'completato' in val_lower or 'valido' in val_lower:
+                                    styled_df.at[i, col] = f"<div style='background-color: lightgreen'>{val}</div>"
+                                elif 'scadenza' in val_lower or 'attenzione' in val_lower or 'in corso' in val_lower:
+                                    styled_df.at[i, col] = f"<div style='background-color: #FFEB9C'>{val}</div>"
+                                elif 'no' in val_lower or 'scaduto' in val_lower or 'error' in val_lower:
+                                    styled_df.at[i, col] = f"<div style='background-color: #FFC7CE'>{val}</div>"
+                            elif isinstance(val, (int, float)):
+                                if val > 0:
+                                    styled_df.at[i, col] = f"<div style='background-color: lightgreen'>{val}</div>"
+                                elif val < 0:
+                                    styled_df.at[i, col] = f"<div style='background-color: #FFC7CE'>{val}</div>"
+                                else:
+                                    styled_df.at[i, col] = f"<div style='background-color: lightgray'>{val}</div>"
+                    
+                    return styled_df
                 
                 # Display the dataframe
+                st.write("Report showing selected columns with color-coding:")
                 st.dataframe(filtered_df, use_container_width=True)
                 
                 # Explain the color coding
