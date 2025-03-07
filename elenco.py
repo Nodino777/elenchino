@@ -93,7 +93,7 @@ st.title("Elenco stato PCG delle aziende")
 
 # Colonne che saranno mostrate nel "Report Dettagliato" del tab3
 SELECTED_COLUMNS = [
-    'SAU 2024',
+    'SAU_2024',  # Changed to underscore to match DataFrame column
     'ESONERO BCAA7',
     'STIMA SOLO PAC 2025',
     'CONTRATTI IN SCADENZA',
