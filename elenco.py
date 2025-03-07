@@ -158,7 +158,7 @@ with tab2:
 ror(f"Error creating scatter plot: {str(e)}")
                 
                 # Summary statistics
-            st.subheader("Summary Statistics")
+                    st.subheader("Summary Statistics")
                 try:
                     st.write(filtered_data.describe())
                 except Exception as e:
