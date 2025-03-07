@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import os
 
+# Set page configuration first (must be the first Streamlit command)
+
+
 # Try importing visualization libraries, but provide fallbacks if not available
 try:
     import plotly.express as px
@@ -22,8 +25,6 @@ try:
 except ImportError:
     # If chardet is not available, we'll use a simpler approach for encoding
     chardet = None
-
-# Set page configuration
 st.set_page_config(
     page_title="CSV Data Viewer & Analyzer",
     page_icon="📊",
