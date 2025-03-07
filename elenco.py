@@ -89,7 +89,7 @@ if 'filter_value' not in st.session_state:
     st.session_state.filter_value = None
 
 # Main app title
-st.title("CSV Data Viewer & Analyzer")
+st.title("Elenco stato PCG delle aziende")
 
 # Load data
 file_path = "https://github.com/Nodino777/elenchino/blob/main/DOMANDE_2025.CSV"  # Replace with the actual path if different
@@ -201,4 +201,4 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.markdown("CSV Data Viewer & Analyzer | Built with Streamlit")
+st.markdown("Elenco stato PCG delle aziende | Built with Simpatia")
