@@ -340,4 +340,4 @@ with tab3:
     
 # Footer
 st.markdown("---")
-st.markdown("Elenco stato PCG delle aziende | Built with Simpatia")
+st.markdown("Elenco stato delle aziende | Built with Simpatia")
