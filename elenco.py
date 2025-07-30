@@ -130,7 +130,7 @@ def handle_selection(selection):
         st.session_state.selected_row_index = None
 
 # Main app title
-st.title("Elenco stato PCG delle aziende")
+st.title("Elenco stato delle aziende")
 
 # Colonne che saranno mostrate nel "Report Dettagliato" del tab3 e nel dettaglio della row selezionata nel tab2
 SELECTED_COLUMNS = [
